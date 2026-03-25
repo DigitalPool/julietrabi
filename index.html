@@ -1,0 +1,149 @@
+<!--
+  ══════════════════════════════════════════════════════
+  WEBFLOW LOADER — Paste into: Pages → Homepage → Head Code
+  ══════════════════════════════════════════════════════
+  INSTRUCTIONS:
+  1. Upload your background image/video to Webflow Assets.
+  2. Replace VIDEO_URL or IMAGE_URL below with the asset URL.
+  3. Paste everything below into Homepage → Custom Code → Head.
+  ══════════════════════════════════════════════════════
+-->
+
+<style>
+  /* ── Reset loader base ── */
+  #wf-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    pointer-events: none;
+  }
+
+  /* Dark panels */
+  .wf-panel {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    background: #0a0a0a;       /* ← change overlay colour here */
+    transition: transform 1.2s cubic-bezier(0.76, 0, 0.24, 1);
+  }
+  .wf-panel-top    { top: 0; }
+  .wf-panel-bottom { bottom: 0; }
+
+  /* Hairline accent on panel edges */
+  .wf-panel-top::after,
+  .wf-panel-bottom::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .wf-panel-top::after     { bottom: 0; }
+  .wf-panel-bottom::before { top: 0; }
+
+  /* Reveal window */
+  .wf-reveal {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    transition: top 1.2s cubic-bezier(0.76, 0, 0.24, 1),
+                height 1.2s cubic-bezier(0.76, 0, 0.24, 1);
+  }
+
+  /* Media inside window — VIDEO version */
+  .wf-reveal video,
+  .wf-reveal img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* Loader fade-out */
+  #wf-loader.wf-done {
+    opacity: 0;
+    transition: opacity 0.8s ease 0.15s;
+  }
+</style>
+
+<!-- Loader markup injected before page content -->
+<script>
+(function () {
+  /* ── 1. Build loader DOM ── */
+  var loader   = document.createElement('div');
+  loader.id    = 'wf-loader';
+
+  var panelTop = document.createElement('div');
+  panelTop.className = 'wf-panel wf-panel-top';
+
+  var panelBot = document.createElement('div');
+  panelBot.className = 'wf-panel wf-panel-bottom';
+
+  var reveal = document.createElement('div');
+  reveal.className = 'wf-reveal';
+
+  /* ── 2. Choose VIDEO or IMAGE ── */
+  var USE_VIDEO = true;   // ← set false to use an image instead
+
+  var VIDEO_URL = '/video-bgd.mov';   // ← replace
+  var IMAGE_URL = '/image-bgd.png'; // ← replace
+
+  var media;
+  if (USE_VIDEO) {
+    media = document.createElement('video');
+    media.src      = VIDEO_URL;
+    media.autoplay = true;
+    media.muted    = true;
+    media.loop     = true;
+    media.playsInline = true;
+  } else {
+    media = document.createElement('img');
+    media.src = IMAGE_URL;
+    media.alt = '';
+  }
+
+  reveal.appendChild(media);
+  loader.appendChild(panelTop);
+  loader.appendChild(reveal);
+  loader.appendChild(panelBot);
+
+  /* ── 3. Inject loader as first child of <body> ── */
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.insertBefore(loader, document.body.firstChild);
+
+    var VH = window.innerHeight;
+
+    /* Initial state — window 0px tall, centred vertically */
+    reveal.style.transition = 'none';
+    reveal.style.top    = (VH / 2) + 'px';
+    reveal.style.height = '0px';
+    media.style.top     = -(VH / 2) + 'px';
+
+    /* Phase 2 (600ms) — panels fly apart, window expands */
+    setTimeout(function () {
+      reveal.style.transition =
+        'top 1.2s cubic-bezier(0.76,0,0.24,1), height 1.2s cubic-bezier(0.76,0,0.24,1)';
+      reveal.style.top    = '0px';
+      reveal.style.height = VH + 'px';
+      media.style.top     = '0px';
+      media.style.transition = 'top 1.2s cubic-bezier(0.76,0,0.24,1)';
+
+      panelTop.style.transform = 'translateY(-100%)';
+      panelBot.style.transform = 'translateY(100%)';
+    }, 600);
+
+    /* Phase 3 (2000ms) — fade loader, show page */
+    setTimeout(function () {
+      loader.classList.add('wf-done');
+      loader.addEventListener('transitionend', function () {
+        loader.style.display = 'none';
+      }, { once: true });
+    }, 2000);
+  });
+})();
+</script>
