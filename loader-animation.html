@@ -1,203 +1,211 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Page Loader</title>
+<!--
+  ══════════════════════════════════════════════════════
+  WEBFLOW LOADER — Paste into: Pages → Homepage → Head Code
+  ══════════════════════════════════════════════════════
+  INSTRUCTIONS:
+  1. Upload your background image/video to Webflow Assets.
+  2. Replace VIDEO_URL or IMAGE_URL below with the asset URL.
+  3. Set USE_VIDEO = true for video, false for image.
+  4. Paste everything into Homepage → Custom Code → Head.
+  ══════════════════════════════════════════════════════
+-->
+ 
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: 'Georgia', serif;
-    background: #0a0a0a;
-    overflow: hidden;
-  }
-
-  /* ─── LOADER WRAPPER ─── */
-  #loader {
+  #wf-loader {
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: 99999;
     pointer-events: none;
   }
-
-  /* Dark overlay panels */
-  .panel {
-    position: absolute;
-    left: 0;
-    width: 100%;
-    height: 50%;
-    background: #0a0a0a;
-    z-index: 2;
-    transition: transform 1.2s cubic-bezier(0.76, 0, 0.24, 1);
-  }
-  .panel-top    { top: 0;   transform-origin: top; }
-  .panel-bottom { bottom: 0; transform-origin: bottom; }
-
-  /* The "window" clip that travels between the two panels */
-  .reveal-window {
-    position: absolute;
-    left: 0;
-    width: 100%;
-    z-index: 1;
-    overflow: hidden;
-    transition: top 1.2s cubic-bezier(0.76, 0, 0.24, 1),
-                height 1.2s cubic-bezier(0.76, 0, 0.24, 1);
-  }
-
-  /* Background image lives inside the window */
-  .reveal-window img {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100vw;
-    height: 100vh;
-    object-fit: cover;
-    display: block;
-  }
-
-  /* Thin accent lines on panel edges */
-  .panel-top::after,
-  .panel-bottom::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    width: 100%;
-    height: 1px;
-    background: rgba(255,255,255,0.25);
-  }
-  .panel-top::after    { bottom: 0; }
-  .panel-bottom::before { top: 0; }
-
-  /* Loader fade-out */
-  #loader.done {
-    opacity: 0;
-    transition: opacity 0.8s ease 0.2s;
-  }
-
-  /* ─── HOMEPAGE ─── */
-  #homepage {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-  #homepage img.bg {
+ 
+  /* Full-screen background media — always visible underneath */
+  #wf-loader .wf-bg {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
   }
-  #homepage .overlay {
+ 
+  /* SVG overlay — dark layer with animated pill holes cut out */
+  #wf-loader svg.wf-mask {
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,0.45);
+    width: 100%;
+    height: 100%;
   }
-  #homepage .content {
-    position: relative;
-    text-align: center;
-    color: #fff;
+ 
+  /* Loader fade-out */
+  #wf-loader.wf-done {
     opacity: 0;
-    transform: translateY(18px);
-    transition: opacity 0.9s ease 0.4s, transform 0.9s ease 0.4s;
-  }
-  #homepage .content.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  #homepage h1 {
-    font-size: clamp(2rem, 5vw, 4rem);
-    font-weight: 300;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-bottom: 1rem;
-  }
-  #homepage p {
-    font-size: 1rem;
-    letter-spacing: 0.12em;
-    opacity: 0.7;
-    font-style: italic;
+    transition: opacity 0.9s ease;
   }
 </style>
-</head>
-<body>
-
-<!-- ═══════════════ LOADER ═══════════════ -->
-<div id="loader">
-  <!-- Top dark panel -->
-  <div class="panel panel-top" id="panelTop"></div>
-
-  <!-- Sliding window that reveals background -->
-  <div class="reveal-window" id="revealWindow">
-    <img src="image-bgd.png" alt="" id="windowImg" />
-  </div>
-
-  <!-- Bottom dark panel -->
-  <div class="panel panel-bottom" id="panelBottom"></div>
-</div>
-
-<!-- ═══════════════ HOMEPAGE ═══════════════ -->
-<div id="homepage">
-  <img class="bg" src="image-bgd.png" alt="Background" />
-  <div class="overlay"></div>
-  <div class="content" id="homeContent">
-    <h1>Welcome</h1>
-    <p>Experience the moment</p>
-  </div>
-</div>
-
+ 
 <script>
-  /*
-   * LOADER LOGIC
-   * ─────────────────────────────────────────────────────────────────
-   * Phase 1 (0 → 600ms)   : initial hold — let page resources settle
-   * Phase 2 (600ms)        : window starts narrow at 50vh, panels part
-   * Phase 3 (~1800ms)      : window fills full viewport, panels gone
-   * Phase 4 (~1900ms)      : loader fades out, homepage content rises
-   */
-
-  const loader      = document.getElementById('loader');
-  const panelTop    = document.getElementById('panelTop');
-  const panelBottom = document.getElementById('panelBottom');
-  const revWin      = document.getElementById('revealWindow');
-  const winImg      = document.getElementById('windowImg');
-  const homeContent = document.getElementById('homeContent');
-
-  const VH = window.innerHeight;
-
-  /* ── Initial state: window = 0px tall, centred ── */
-  function setWindow(topPx, heightPx) {
-    revWin.style.top    = topPx + 'px';
-    revWin.style.height = heightPx + 'px';
-    winImg.style.top    = -topPx + 'px';   /* keep bg locked to viewport */
+(function () {
+ 
+  /* ══════════════════════════════════
+     CONFIG — edit these three lines
+  ══════════════════════════════════ */
+  var USE_VIDEO  = true;
+  var VIDEO_URL  = '/video-bgd.mov';   // ← your Webflow asset URL
+  var IMAGE_URL  = '/image-bgd.png';   // ← your Webflow asset URL
+  /* ══════════════════════════════════ */
+ 
+  /* ── Build loader shell ── */
+  var loader = document.createElement('div');
+  loader.id  = 'wf-loader';
+ 
+  /* ── Background media ── */
+  var media;
+  if (USE_VIDEO) {
+    media = document.createElement('video');
+    media.src         = VIDEO_URL;
+    media.autoplay    = true;
+    media.muted       = true;
+    media.loop        = true;
+    media.playsInline = true;
+  } else {
+    media = document.createElement('img');
+    media.src = IMAGE_URL;
+    media.alt = '';
   }
-
-  /* Start collapsed at mid-screen */
-  revWin.style.transition = 'none';
-  setWindow(VH / 2, 0);
-
-  /* Phase 2 — expand window to full height */
-  setTimeout(() => {
-    revWin.style.transition =
-      'top 1.2s cubic-bezier(0.76,0,0.24,1), height 1.2s cubic-bezier(0.76,0,0.24,1)';
-    setWindow(0, VH);
-
-    panelTop.style.transform    = 'translateY(-100%)';
-    panelBottom.style.transform = 'translateY(100%)';
-  }, 600);
-
-  /* Phase 4 — fade loader, reveal content */
-  setTimeout(() => {
-    loader.classList.add('done');
-    loader.addEventListener('transitionend', () => {
-      loader.style.display = 'none';
-    }, { once: true });
-    homeContent.classList.add('visible');
-  }, 2000);
+  media.className = 'wf-bg';
+  loader.appendChild(media);
+ 
+  /* ── SVG mask overlay ── */
+  var NS  = 'http://www.w3.org/2000/svg';
+ 
+  var svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('xmlns', NS);
+  svg.classList.add('wf-mask');
+  svg.setAttribute('preserveAspectRatio', 'none');
+ 
+  /* defs → mask */
+  var defs = document.createElementNS(NS, 'defs');
+  var mask = document.createElementNS(NS, 'mask');
+  mask.setAttribute('id', 'wf-pill-mask');
+ 
+  /* White rect = show everything by default */
+  var whiteRect = document.createElementNS(NS, 'rect');
+  whiteRect.setAttribute('id', 'wf-white');
+  whiteRect.setAttribute('x', '0');
+  whiteRect.setAttribute('y', '0');
+  whiteRect.setAttribute('width', '100%');
+  whiteRect.setAttribute('height', '100%');
+  whiteRect.setAttribute('fill', 'white');
+ 
+  /* Two black pills = punch holes in the mask (hide overlay there → reveal bg) */
+  var pillTop = document.createElementNS(NS, 'rect');
+  pillTop.setAttribute('id', 'wf-pill-top');
+  pillTop.setAttribute('fill', 'black');
+ 
+  var pillBot = document.createElementNS(NS, 'rect');
+  pillBot.setAttribute('id', 'wf-pill-bot');
+  pillBot.setAttribute('fill', 'black');
+ 
+  mask.appendChild(whiteRect);
+  mask.appendChild(pillTop);
+  mask.appendChild(pillBot);
+  defs.appendChild(mask);
+  svg.appendChild(defs);
+ 
+  /* Dark overlay rect that uses the mask */
+  var overlay = document.createElementNS(NS, 'rect');
+  overlay.setAttribute('x', '0');
+  overlay.setAttribute('y', '0');
+  overlay.setAttribute('width', '100%');
+  overlay.setAttribute('height', '100%');
+  overlay.setAttribute('fill', '#1a1a1a');   /* ← overlay colour */
+  overlay.setAttribute('mask', 'url(#wf-pill-mask)');
+ 
+  svg.appendChild(overlay);
+  loader.appendChild(svg);
+ 
+  /* ── Inject into DOM ── */
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.insertBefore(loader, document.body.firstChild);
+ 
+    var VW = window.innerWidth;
+    var VH = window.innerHeight;
+ 
+    /* ─── Pill geometry ───
+       Two pills side by side, each ~38% of viewport width,
+       centred together, with a small gap between them.
+       Height is tall enough to be "pill" shaped (taller than wide).
+       rx = half the width → rounded ends.
+    */
+    var GAP      = VW * 0.04;           // gap between pills
+    var PW       = VW * 0.36;           // pill width
+    var PH       = VH * 50;           // pill height
+    var RX       = PW * 0.5;            // border-radius (full round ends)
+    var totalW   = PW * 2 + GAP;
+    var startX1  = (VW - totalW) / 2;   // left pill x
+    var startX2  = startX1 + PW + GAP;  // right pill x
+ 
+    /* Pills start OFF-SCREEN: top pill above viewport, bottom pill below */
+    var topY_start  = -PH;              // top pill: above screen
+    var botY_start  = VH;               // bottom pill: below screen
+ 
+    /* Pills travel THROUGH each other to the opposite side */
+    var topY_end    = VH;               // top pill exits bottom
+    var botY_end    = -PH;              // bottom pill exits top
+ 
+    function setPill(el, x, y) {
+      el.setAttribute('x',      x);
+      el.setAttribute('y',      y);
+      el.setAttribute('width',  PW);
+      el.setAttribute('height', PH);
+      el.setAttribute('rx',     RX);
+      el.setAttribute('ry',     RX);
+    }
+ 
+    /* ── Phase 0: set initial positions ── */
+    setPill(pillTop, startX1, topY_start);
+    setPill(pillBot, startX2, botY_start);
+ 
+    /* ── Easing helper (ease-in-out cubic) ── */
+    function easeInOut(t) {
+      return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+    }
+ 
+    /* ── Animate pills from start → end ── */
+    var DURATION  = 2000;   // ms for pills to travel through
+    var HOLD      = 400;    // ms before animation starts
+    var startTime = null;
+ 
+    function animatePills(ts) {
+      if (!startTime) startTime = ts;
+      var elapsed = ts - startTime;
+      var t = Math.min(elapsed / DURATION, 1);
+      var e = easeInOut(t);
+ 
+      var topY = topY_start + (topY_end - topY_start) * e;
+      var botY = botY_start + (botY_end - botY_start) * e;
+ 
+      pillTop.setAttribute('y', topY);
+      pillBot.setAttribute('y', botY);
+ 
+      if (t < 1) {
+        requestAnimationFrame(animatePills);
+      } else {
+        /* Pills have exited — fade out entire loader */
+        setTimeout(function () {
+          loader.classList.add('wf-done');
+          loader.addEventListener('transitionend', function () {
+            loader.style.display = 'none';
+          }, { once: true });
+        }, 200);
+      }
+    }
+ 
+    setTimeout(function () {
+      requestAnimationFrame(animatePills);
+    }, HOLD);
+ 
+  }); // DOMContentLoaded
+ 
+})();
 </script>
-
-</body>
-</html>
