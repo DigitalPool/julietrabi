@@ -137,13 +137,13 @@
       panelBot.style.transform = 'translateY(100%)';
     }, 600);
 
-    /* Phase 3 (2000ms) — fade loader, show page */
+    /* Phase 3 (5000ms) — fade loader, show page */
     setTimeout(function () {
       loader.classList.add('wf-done');
       loader.addEventListener('transitionend', function () {
         loader.style.display = 'none';
       }, { once: true });
-    }, 2000);
+    }, 5000);
   });
 })();
 </script>
