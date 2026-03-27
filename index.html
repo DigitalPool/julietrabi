@@ -45,6 +45,7 @@
     media.autoplay    = true;
     media.muted       = true;
     media.loop        = true;
+    media.preload     = 'auto';
     media.playsInline = true;
   } else {
     media = document.createElement('img');
@@ -139,6 +140,7 @@
     var DURATION  = 2000;  
     var HOLD      = 400;   
     var startTime = null;
+    var animationStarted = false;
  
     function animatePills(ts) {
       if (!startTime) startTime = ts;
@@ -163,10 +165,30 @@
         }, 200);
       }
     }
- 
-    setTimeout(function () {
-      requestAnimationFrame(animatePills);
-    }, HOLD);
+
+    function startAnimation() {
+      if (animationStarted) return;
+      animationStarted = true;
+      if (USE_VIDEO) {
+        media.play().catch(function () {});
+      }
+      setTimeout(function () {
+        requestAnimationFrame(animatePills);
+      }, HOLD);
+    }
+
+    if (USE_VIDEO) {
+      if (media.readyState >= 2) {
+        startAnimation();
+      } else {
+        media.addEventListener('loadeddata', startAnimation, { once: true });
+        media.addEventListener('canplay', startAnimation, { once: true });
+      }
+    } else if (media.complete) {
+      startAnimation();
+    } else {
+      media.addEventListener('load', startAnimation, { once: true });
+    }
  
   });
  
